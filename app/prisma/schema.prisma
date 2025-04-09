@@ -1,0 +1,182 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Account {
+  id                String   @id @default(cuid())
+  userId            Int
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?  @db.Text
+  access_token      String?  @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?  @db.Text
+  session_state     String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       Int
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id            Int       @id @default(autoincrement())
+  name          String
+  email         String    @unique
+  emailVerified DateTime?
+  password      String?
+  image         String?
+  phone         String?
+  role          String    @default("user") // Add role field with a default value
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts Account[]
+  sessions Session[]
+  vCards   VCard[]
+  teams    TeamMember[]
+  files    File[]
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model VCard {
+  id              String       @id @default(cuid())
+  userId          Int
+  name            String
+  email           String
+  phone           String
+  website         String?
+  company         String?
+  position        String?
+  address         String?
+  bio             String?
+  enableNFC       Boolean      @default(false)
+  template        String       @default("template1")
+  primaryColor    String       @default("#4285F4")
+  profileImageUrl String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  socialLinks SocialLink[]
+  publicLinks VCardPublic[]
+  nfcLink     NFCLink?
+  scanLogs    ScanLog[]
+}
+
+model SocialLink {
+  id        String   @id @default(cuid())
+  vCardId   String
+  platform  String
+  url       String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  vCard VCard @relation(fields: [vCardId], references: [id], onDelete: Cascade)
+}
+
+model VCardPublic {
+  id        String   @id @default(cuid())
+  vCardId   String
+  publicId  String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+
+  vCard VCard @relation(fields: [vCardId], references: [id], onDelete: Cascade)
+}
+
+model NFCLink {
+  id             String   @id @default(cuid())
+  vCardId        String   @unique
+  nfcCardId      String
+  lastProgrammed DateTime
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  vCard VCard @relation(fields: [vCardId], references: [id], onDelete: Cascade)
+}
+
+model ScanLog {
+  id        String   @id @default(cuid())
+  vCardId   String
+  scanType  String   // "QR" or "NFC"
+  deviceType String?
+  location  String?
+  createdAt DateTime @default(now())
+
+  vCard VCard @relation(fields: [vCardId], references: [id], onDelete: Cascade)
+}
+
+model Team {
+  id          String       @id @default(cuid())
+  name        String
+  description String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  members TeamMember[]
+}
+
+model TeamMember {
+  id        String   @id @default(cuid())
+  teamId    String
+  userId    Int
+  role      String   // "admin", "manager", "editor", "viewer"
+  status     String @default("active") // "active" or "pending"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  permissions TeamMemberPermission?
+
+  @@unique([teamId, userId])
+}
+
+model TeamMemberPermission {
+  id           String   @id @default(cuid())
+  teamMemberId String   @unique
+  createCards  Boolean  @default(false)
+  editCards    Boolean  @default(false)
+  deleteCards  Boolean  @default(false)
+  manageTeam   Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  teamMember TeamMember @relation(fields: [teamMemberId], references: [id], onDelete: Cascade)
+}
+
+model File {
+  id         Int      @id @default(autoincrement())
+  filename   String
+  contentType String
+  key        String
+  userId     Int?
+  user       User?    @relation(fields: [userId], references: [id])
+  createdAt  DateTime @default(now())
+}
