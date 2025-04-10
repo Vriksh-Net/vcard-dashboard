@@ -472,6 +472,7 @@
 // }
 
 
+
 "use client"
 
 import { useEffect, useState } from "react"
@@ -500,6 +501,7 @@ interface VCard {
   primaryColor: string
   profileImageUrl?: string | null
   socialLinks: SocialLink[]
+  publicId?: string
 }
 
 interface DebugInfo {
@@ -509,7 +511,7 @@ interface DebugInfo {
   message?: string
 }
 
-export default function VCardClientPage({ id, publicId }: { id: string; publicId: string | null }) {
+export default function VCardClientPage({ id, publicId }: { id: string; publicId?:string | null }) {
   const [vCard, setVCard] = useState<VCard | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -522,8 +524,14 @@ export default function VCardClientPage({ id, publicId }: { id: string; publicId
         setLoading(true)
         console.log("Fetching vCard with ID:", id)
 
-        // Fetch vCard data from the API using the correct endpoint
-        const response = await fetch(`/api/vcards/${id}`)
+        // First try the main API endpoint
+        let response = await fetch(`/api/vcards/${id}`)
+
+        // If that fails, try the debug endpoint
+        if (!response.ok) {
+          console.log("Main API failed, trying debug endpoint")
+          response = await fetch(`/api/debug/vcard/${id}`)
+        }
 
         if (!response.ok) {
           console.error("API response not OK:", response.status, response.statusText)
@@ -579,6 +587,22 @@ export default function VCardClientPage({ id, publicId }: { id: string; publicId
       } catch (error) {
         console.error("Error fetching vCard:", error)
         setError(error instanceof Error ? error.message : "Failed to load vCard data. Please try again later.")
+
+        // Try to fetch debug information about available vCards
+        try {
+          const debugResponse = await fetch("/api/debug/vcard-test")
+          if (debugResponse.ok) {
+            const debugData = await debugResponse.json()
+            console.log("Debug data:", debugData)
+            setDebugInfo({
+              requestedId: id,
+              sampleIds: debugData.vCards?.map((v: any) => v.id) || [],
+              message: `Found ${debugData.vCardCount} vCards and ${debugData.publicLinkCount} public links in database.`,
+            })
+          }
+        } catch (debugError) {
+          console.error("Error fetching debug info:", debugError)
+        }
       } finally {
         setLoading(false)
       }
@@ -647,16 +671,16 @@ export default function VCardClientPage({ id, publicId }: { id: string; publicId
   // Function to generate vCard file content
   const generateVCardFile = () => {
     let vcardContent = `BEGIN:VCARD
-    VERSION:3.0
-    FN:${vCard.name}
-    N:${vCard.name};;;
-    ORG:${vCard.company || ""}
-    TITLE:${vCard.position || ""}
-    TEL;TYPE=WORK,VOICE:${vCard.phone}
-    EMAIL;TYPE=WORK:${vCard.email}
-    URL:${vCard.website || ""}
-    ADR;TYPE=WORK:;;${vCard.address || ""};;;
-    NOTE:${vCard.bio || ""}
+VERSION:3.0
+FN:${vCard.name}
+N:${vCard.name};;;
+ORG:${vCard.company || ""}
+TITLE:${vCard.position || ""}
+TEL;TYPE=WORK,VOICE:${vCard.phone}
+EMAIL;TYPE=WORK:${vCard.email}
+URL:${vCard.website || ""}
+ADR;TYPE=WORK:;;${vCard.address || ""};;;
+NOTE:${vCard.bio || ""}
 `
 
     // Add social media URLs as URLs with labels
