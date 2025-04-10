@@ -257,8 +257,9 @@ export default async function VCardPage({ params }: PageProps) {
     // First, try to find by publicId
     let vcard = null
     let vcardId = id
+    let publicLink = null
 
-    const publicLink = await db.vCardPublic.findUnique({
+    publicLink = await db.vCardPublic.findUnique({
       where: {
         publicId: id,
       },
@@ -330,7 +331,8 @@ export default async function VCardPage({ params }: PageProps) {
       console.error("Error logging scan:", error)
     }
 
-    return <VCardClientPage id={vcardId} />
+    // Pass both the ID and the public ID to the client component
+    return <VCardClientPage id={vcardId} publicId={publicLink?.publicId || null} />
   } catch (error) {
     console.error("Error fetching vCard:", error)
     return (
