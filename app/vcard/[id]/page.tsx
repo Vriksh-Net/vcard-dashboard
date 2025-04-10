@@ -186,9 +186,11 @@ interface PageProps {
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const { id } = await params
+  const { id } = params
 
   try {
+    console.log("Generating metadata for vCard with ID:", id)
+
     //! First, try to find by publicId
     let vcard = null
     const publicLink = await db.vCardPublic.findUnique({
@@ -202,6 +204,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
     if (publicLink) {
       vcard = publicLink.vCard
+      console.log("Found vCard via publicId:", vcard.id)
     } else {
       //todo: If not found by publicId, try to find by ID
       vcard = await db.vCard.findUnique({
@@ -209,6 +212,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
           id: id,
         },
       })
+
+      if (vcard) {
+        console.log("Found vCard via direct ID:", vcard.id)
+      } else {
+        console.log("vCard not found with ID or publicId:", id)
+      }
     }
 
     if (!vcard) {
@@ -238,7 +247,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 }
 
 export default async function VCardPage({ params }: PageProps) {
-  const { id } = await params
+  const { id } = params
 
   try {
     console.log("VCardPage: Looking up vCard with ID/publicId:", id)
@@ -257,6 +266,7 @@ export default async function VCardPage({ params }: PageProps) {
     // First, try to find by publicId
     let vcard = null
     let vcardId = id
+    let publicId = null
     let publicLink = null
 
     publicLink = await db.vCardPublic.findUnique({
@@ -276,6 +286,7 @@ export default async function VCardPage({ params }: PageProps) {
       console.log("Found vCard via publicId:", publicLink.vCard.id)
       vcard = publicLink.vCard
       vcardId = publicLink.vCard.id
+      publicId = publicLink.publicId
     } else {
       // If not found by publicId, try to find by ID
       console.log("Not found by publicId, trying direct ID lookup")
@@ -290,6 +301,17 @@ export default async function VCardPage({ params }: PageProps) {
 
       if (vcard) {
         console.log("Found vCard via direct ID:", vcard.id)
+
+        // Try to get the publicId for this vCard
+        const publicLinkForVCard = await db.vCardPublic.findFirst({
+          where: {
+            vCardId: vcard.id,
+          },
+        })
+
+        if (publicLinkForVCard) {
+          publicId = publicLinkForVCard.publicId
+        }
       }
     }
 
@@ -312,6 +334,16 @@ export default async function VCardPage({ params }: PageProps) {
               <p>Requested ID: {id}</p>
               <p>Available vCards: {sampleVCards.length}</p>
               <p>Available public links: {allPublicLinks.length}</p>
+              <p>
+                <a
+                  href="/api/debug/vercel-route-test"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 underline"
+                >
+                  Run Route Test
+                </a>
+              </p>
             </div>
           </div>
         </div>
@@ -332,7 +364,7 @@ export default async function VCardPage({ params }: PageProps) {
     }
 
     // Pass both the ID and the public ID to the client component
-    return <VCardClientPage id={vcardId} publicId={publicLink?.publicId || null} />
+    return <VCardClientPage id={vcardId} publicId={publicId} />
   } catch (error) {
     console.error("Error fetching vCard:", error)
     return (
@@ -343,6 +375,16 @@ export default async function VCardPage({ params }: PageProps) {
           <p className="mt-4 text-sm text-gray-500">
             Error details: {error instanceof Error ? error.message : String(error)}
           </p>
+          <div className="mt-4">
+            <a
+              href="/api/debug/vercel-route-test"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 underline"
+            >
+              Run Route Test
+            </a>
+          </div>
         </div>
       </div>
     )

@@ -472,7 +472,6 @@
 // }
 
 
-
 "use client"
 
 import { useEffect, useState } from "react"
@@ -511,7 +510,7 @@ interface DebugInfo {
   message?: string
 }
 
-export default function VCardClientPage({ id, publicId }: { id: string; publicId?:string | null }) {
+export default function VCardClientPage({ id, publicId }: { id: string; publicId: string | null }) {
   const [vCard, setVCard] = useState<VCard | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -522,15 +521,37 @@ export default function VCardClientPage({ id, publicId }: { id: string; publicId
     const fetchVCard = async () => {
       try {
         setLoading(true)
-        console.log("Fetching vCard with ID:", id)
+        console.log("Fetching vCard with ID:", id, "publicId:", publicId)
 
-        // First try the main API endpoint
-        let response = await fetch(`/api/vcards/${id}`)
+        // Try different endpoints in order of preference
+        let response
+        let endpoint
 
-        // If that fails, try the debug endpoint
-        if (!response.ok) {
-          console.log("Main API failed, trying debug endpoint")
-          response = await fetch(`/api/debug/vcard/${id}`)
+        // 1. If we have a publicId, try the dedicated public endpoint first
+        if (publicId) {
+          endpoint = `/api/vcards/public/${publicId}`
+          console.log("Trying public endpoint:", endpoint)
+          response = await fetch(endpoint)
+          if (response.ok) {
+            console.log("Public endpoint successful")
+          }
+        }
+
+        // 2. If public endpoint failed or no publicId, try the direct ID endpoint
+        if (!response || !response.ok) {
+          endpoint = `/api/vcards/${id}`
+          console.log("Trying direct ID endpoint:", endpoint)
+          response = await fetch(endpoint)
+          if (response.ok) {
+            console.log("Direct ID endpoint successful")
+          }
+        }
+
+        // 3. If both failed, try the debug endpoint
+        if (!response || !response.ok) {
+          endpoint = `/api/debug/vcard/${id}`
+          console.log("Trying debug endpoint:", endpoint)
+          response = await fetch(endpoint)
         }
 
         if (!response.ok) {
@@ -590,7 +611,7 @@ export default function VCardClientPage({ id, publicId }: { id: string; publicId
 
         // Try to fetch debug information about available vCards
         try {
-          const debugResponse = await fetch("/api/debug/vcard-test")
+          const debugResponse = await fetch("/api/debug/vercel-route-test")
           if (debugResponse.ok) {
             const debugData = await debugResponse.json()
             console.log("Debug data:", debugData)
@@ -609,7 +630,9 @@ export default function VCardClientPage({ id, publicId }: { id: string; publicId
     }
 
     fetchVCard()
-  }, [id])
+  }, [id, publicId])
+
+  // Rest of the component remains the same...
 
   if (loading) {
     return (
@@ -686,7 +709,8 @@ NOTE:${vCard.bio || ""}
     // Add social media URLs as URLs with labels
     if (vCard.socialLinks && vCard.socialLinks.length > 0) {
       vCard.socialLinks.forEach((link) => {
-        vcardContent += `URL;TYPE=${link.platform.toUpperCase()}:${link.url}\n`
+        vcardContent += `URL;TYPE=${link.platform.toUpperCase()}:${link.url}
+`
       })
     }
 
